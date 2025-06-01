@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, Suspense } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,7 +12,6 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 
-// Datos de ejemplo de pacientes
 const patients = [
   { id: "001", name: "María González", phone: "555-0123" },
   { id: "002", name: "Carlos Rodríguez", phone: "555-0124" },
@@ -21,7 +20,6 @@ const patients = [
   { id: "005", name: "Carmen López", phone: "555-0127" },
 ]
 
-// Horarios disponibles
 const timeSlots = [
   "09:00",
   "09:30",
@@ -50,7 +48,7 @@ const appointmentTypes = [
 
 const doctors = ["Dr. Ana Rodríguez", "Dr. Carlos Méndez", "Dr. María Fernández", "Técnico Especialista"]
 
-export default function NewAppointmentPage() {
+function NewAppointmentPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preselectedPatient = searchParams.get("patient")
@@ -66,8 +64,8 @@ export default function NewAppointmentPage() {
     type: "",
     doctor: "",
     notes: "",
-    duration: "30", // minutos
-    reminder: "24", // horas antes
+    duration: "30",
+    reminder: "24",
   })
 
   const filteredPatients = patients.filter(
@@ -96,13 +94,11 @@ export default function NewAppointmentPage() {
   const handleSave = async () => {
     setIsLoading(true)
 
-    // Simular guardado
     await new Promise((resolve) => setTimeout(resolve, 2000))
 
     setIsLoading(false)
     setShowSuccess(true)
 
-    // Redirigir después de 2 segundos
     setTimeout(() => {
       router.push("/dashboard/appointments")
     }, 2000)
@@ -143,7 +139,6 @@ export default function NewAppointmentPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
           <Link href="/dashboard/appointments">
@@ -177,7 +172,6 @@ export default function NewAppointmentPage() {
         </div>
       </div>
 
-      {/* Form Validation Alert */}
       {!isFormValid() && (
         <Alert>
           <Calendar className="h-4 w-4" />
@@ -188,7 +182,6 @@ export default function NewAppointmentPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* Información de la Cita */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -198,7 +191,6 @@ export default function NewAppointmentPage() {
             <CardDescription>Complete los detalles de la cita a programar</CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Selección de Paciente */}
             <div className="space-y-2">
               <Label htmlFor="patient">Paciente *</Label>
               {appointmentData.patientId ? (
@@ -250,7 +242,6 @@ export default function NewAppointmentPage() {
               )}
             </div>
 
-            {/* Fecha y Hora */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="date">Fecha *</Label>
@@ -280,7 +271,6 @@ export default function NewAppointmentPage() {
               </div>
             </div>
 
-            {/* Tipo de Cita */}
             <div className="space-y-2">
               <Label htmlFor="type">Tipo de Cita *</Label>
               <Select onValueChange={(value) => handleInputChange("type", value)}>
@@ -297,7 +287,6 @@ export default function NewAppointmentPage() {
               </Select>
             </div>
 
-            {/* Doctor */}
             <div className="space-y-2">
               <Label htmlFor="doctor">Doctor/Especialista *</Label>
               <Select onValueChange={(value) => handleInputChange("doctor", value)}>
@@ -314,7 +303,6 @@ export default function NewAppointmentPage() {
               </Select>
             </div>
 
-            {/* Duración */}
             <div className="space-y-2">
               <Label htmlFor="duration">Duración (minutos)</Label>
               <Select value={appointmentData.duration} onValueChange={(value) => handleInputChange("duration", value)}>
@@ -331,7 +319,6 @@ export default function NewAppointmentPage() {
               </Select>
             </div>
 
-            {/* Notas */}
             <div className="space-y-2">
               <Label htmlFor="notes">Notas y Observaciones</Label>
               <Textarea
@@ -345,7 +332,6 @@ export default function NewAppointmentPage() {
           </CardContent>
         </Card>
 
-        {/* Resumen y Configuración */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
@@ -402,7 +388,6 @@ export default function NewAppointmentPage() {
               </div>
             )}
 
-            {/* Configuración de Recordatorios */}
             <div className="space-y-4">
               <h4 className="font-medium">Configuración de Recordatorios</h4>
               <div className="space-y-2">
@@ -425,7 +410,6 @@ export default function NewAppointmentPage() {
               </div>
             </div>
 
-            {/* Acciones Rápidas */}
             <div className="space-y-4">
               <h4 className="font-medium">Acciones Adicionales</h4>
               <div className="space-y-2">
@@ -448,5 +432,13 @@ export default function NewAppointmentPage() {
         </Card>
       </div>
     </div>
+  )
+}
+
+export default function NewAppointmentPage() {
+  return (
+    <Suspense>
+      <NewAppointmentPageContent />
+    </Suspense>
   )
 }

@@ -1,30 +1,69 @@
-# Optica patient dashboard
+# Optica Patient Dashboard
 
-*Automatically synced with your [v0.dev](https://v0.dev) deployments*
+## Provider Structure
 
-[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/ruclaxs-projects/v0-optica-patient-dashboard)
-[![Built with v0](https://img.shields.io/badge/Built%20with-v0.dev-black?style=for-the-badge)](https://v0.dev/chat/projects/gqIg6wrfXmG)
+The application uses a hierarchical provider structure to manage state and functionality across the platform:
 
-## Overview
+### Root Provider
+- Wraps all other providers
+- Handles theme management
+- Provides error boundary
 
-This repository will stay in sync with your deployed chats on [v0.dev](https://v0.dev).
-Any changes you make to your deployed app will be automatically pushed to this repository from [v0.dev](https://v0.dev).
+### Auth Provider
+- Manages authentication state
+- Handles login/logout
+- Persists user session
 
-## Deployment
+### Data Provider
+- Manages application data (patients, appointments)
+- Handles data fetching and caching
+- Provides CRUD operations
 
-Your project is live at:
+### Error Boundary
+- Catches and handles errors
+- Provides fallback UI
+- Prevents app crashes
 
-**[https://vercel.com/ruclaxs-projects/v0-optica-patient-dashboard](https://vercel.com/ruclaxs-projects/v0-optica-patient-dashboard)**
+## Usage Examples
 
-## Build your app
+### Auth Provider
+```tsx
+import { useAuth } from "@/providers/auth-provider"
 
-Continue building your app on:
+function LoginComponent() {
+  const { login, isLoading } = useAuth()
+  
+  const handleLogin = async () => {
+    await login(username, password)
+  }
+}
+```
 
-**[https://v0.dev/chat/projects/gqIg6wrfXmG](https://v0.dev/chat/projects/gqIg6wrfXmG)**
+### Data Provider
+```tsx
+import { useData } from "@/providers/data-provider"
 
-## How It Works
+function AppointmentList() {
+  const { appointments, fetchAppointments } = useData()
+  
+  useEffect(() => {
+    fetchAppointments()
+  }, [])
+}
+```
 
-1. Create and modify your project using [v0.dev](https://v0.dev)
-2. Deploy your chats from the v0 interface
-3. Changes are automatically pushed to this repository
-4. Vercel deploys the latest version from this repository
+## Performance Considerations
+
+- State updates are batched to prevent unnecessary re-renders
+- Context splitting prevents global re-renders
+- Error boundaries isolate failures
+- Lazy loading for better initial load performance
+
+## Edge Cases Handled
+
+- Authentication token expiration
+- Network failures
+- Data validation
+- Error recovery
+- Loading states
+- Session persistence

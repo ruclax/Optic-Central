@@ -1,5 +1,6 @@
 "use client"
 
+import { Suspense } from "react"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,7 +35,7 @@ const examTypes = [
 
 const doctors = ["Dr. Ana Rodríguez", "Dr. Carlos Méndez", "Dr. María Fernández"]
 
-export default function NewExamPage() {
+function NewExamPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const preselectedPatient = searchParams.get("patient")
@@ -516,5 +517,13 @@ export default function NewExamPage() {
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+export default function NewExamPage() {
+  return (
+    <Suspense>
+      <NewExamPageContent />
+    </Suspense>
   )
 }
