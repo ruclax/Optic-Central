@@ -51,27 +51,62 @@ const sheetVariants = cva(
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+  VariantProps<typeof sheetVariants> { }
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => (
-  <SheetPortal>
-    <SheetOverlay />
-    <SheetPrimitive.Content
-      ref={ref}
-      className={cn(sheetVariants({ side }), className)}
-      {...props}
-    >
-      {children}
-      <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </SheetPrimitive.Close>
-    </SheetPrimitive.Content>
-  </SheetPortal>
-))
+>(({ side = "right", className, children, ...props }, ref) => {
+  let hasTitle = false
+  React.Children.forEach(children, (child) => {
+    if (
+      React.isValidElement(child) &&
+      (child.type === SheetHeader || child.type === SheetTitle)
+    ) {
+      // Si SheetHeader contiene SheetTitle, también es válido
+      if (child.type === SheetHeader) {
+        const headerChildren = (child.props as any).children
+        React.Children.forEach(headerChildren, (headerChild) => {
+          if (
+            React.isValidElement(headerChild) &&
+            headerChild.type === SheetTitle
+          ) {
+            hasTitle = true
+          }
+        })
+      } else {
+        hasTitle = true
+      }
+    }
+  })
+
+  // Si no hay SheetTitle, insertamos uno oculto para accesibilidad
+  const childrenWithHiddenTitle = hasTitle
+    ? children
+    : [
+      <SheetHeader key="hidden-title">
+        <SheetTitle className="sr-only">Título</SheetTitle>
+      </SheetHeader>,
+      ...React.Children.toArray(children),
+    ]
+
+  return (
+    <SheetPortal>
+      <SheetOverlay />
+      <SheetPrimitive.Content
+        ref={ref}
+        className={cn(sheetVariants({ side }), className)}
+        {...props}
+      >
+        {childrenWithHiddenTitle}
+        <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </SheetPrimitive.Close>
+      </SheetPrimitive.Content>
+    </SheetPortal>
+  )
+})
 SheetContent.displayName = SheetPrimitive.Content.displayName
 
 const SheetHeader = ({

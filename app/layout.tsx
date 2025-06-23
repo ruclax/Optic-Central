@@ -8,7 +8,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "Óptica Central - Sistema de Gestión",
-  description: "Sistema completo de gestión para Óptica Central - Control de expedientes, citas y operaciones",
+  description: "Sistema de gestión para Óptica Central: pacientes, exámenes y usuarios.",
   generator: "v0.dev",
 }
 
@@ -18,7 +18,7 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="es">
+    <html lang="es" suppressHydrationWarning>
       <body className={inter.className}>
         <RootProvider>{children}</RootProvider>
       </body>

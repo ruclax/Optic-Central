@@ -22,3 +22,4 @@ export function RootProvider({ children }: { children: React.ReactNode }) {
     </ErrorBoundary>
   )
 }
+ 

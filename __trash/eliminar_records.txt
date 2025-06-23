@@ -1,0 +1,11 @@
+# Instrucciones para eliminar la carpeta records
+
+Puedes eliminar manualmente la carpeta:
+
+app/dashboard/records/
+
+Incluyendo:
+- app/dashboard/records/page.tsx
+- app/dashboard/records/[id]/page.tsx
+
+O moverlos a __trash para respaldo temporal.

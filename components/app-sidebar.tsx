@@ -1,21 +1,13 @@
 "use client"
 
-import type * as React from "react"
+import type * as React from "react";
+import { ChevronUp, Settings, User2, Glasses, LogOut } from "lucide-react";
 import {
-  Calendar,
-  ChevronUp,
-  Home,
-  Settings,
-  User2,
-  Users,
-  FileText,
-  Package,
-  DollarSign,
-  BarChart3,
-  Eye,
-  Glasses,
-  Shield,
-} from "lucide-react"
+  mainNavigationItems,
+  businessNavigationItems,
+  systemNavigationItems,
+} from "@/lib/navigation" // Asegúrate que la ruta de importación sea correcta
+import { useIsAdmin } from "@/hooks/useRoles"
 
 import {
   Sidebar,
@@ -32,67 +24,9 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 
-// Menu items.
-const items = [
-  {
-    title: "Dashboard",
-    url: "/dashboard",
-    icon: Home,
-  },
-  {
-    title: "Pacientes",
-    url: "/dashboard/patients",
-    icon: Users,
-  },
-  {
-    title: "Expedientes",
-    url: "/dashboard/records",
-    icon: FileText,
-  },
-  {
-    title: "Citas",
-    url: "/dashboard/appointments",
-    icon: Calendar,
-  },
-  {
-    title: "Exámenes",
-    url: "/dashboard/exams",
-    icon: Eye,
-  },
-]
-
-const businessItems = [
-  {
-    title: "Inventario",
-    url: "/dashboard/inventory",
-    icon: Package,
-  },
-  {
-    title: "Ventas",
-    url: "/dashboard/sales",
-    icon: DollarSign,
-  },
-  {
-    title: "Reportes",
-    url: "/dashboard/reports",
-    icon: BarChart3,
-  },
-]
-
-const systemItems = [
-  {
-    title: "Usuarios",
-    url: "/dashboard/users",
-    icon: Shield,
-  },
-  {
-    title: "Configuración",
-    url: "/dashboard/settings",
-    icon: Settings,
-  },
-]
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const isAdmin = useIsAdmin();
   return (
     <Sidebar variant="inset" {...props}>
       <SidebarHeader>
@@ -117,7 +51,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>Principal</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {items.map((item) => (
+              {mainNavigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url}>
@@ -134,7 +68,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>Negocio</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {businessItems.map((item) => (
+              {businessNavigationItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <Link href={item.url}>
@@ -151,16 +85,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupLabel>Sistema</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {systemItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <Link href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {systemNavigationItems.map((item) => {
+                if (item.title === "Usuarios" && !isAdmin) return null;
+                return (
+                  <SidebarMenuItem key={item.title}>
+                    <SidebarMenuButton asChild>
+                      <Link href={item.url}>
+                        <item.icon />
+                        <span>{item.title}</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
@@ -189,14 +126,19 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 sideOffset={4}
               >
                 <DropdownMenuItem>
-                  <User2 />
+                  <User2 className="mr-2 h-4 w-4" />
                   Mi Perfil
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <Settings />
+                  <Settings className="mr-2 h-4 w-4" />
                   Configuración
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={async () => {
+                  const { logout } = require("@/providers/auth-provider");
+                  await logout();
+                  window.location.href = "/";
+                }}>
+                  <LogOut className="mr-2 h-4 w-4" />
                   <span>Cerrar Sesión</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>

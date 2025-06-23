@@ -1,5 +1,6 @@
 "use client"
 
+import { supabase } from "@/lib/supabaseClient"
 import React, { createContext, useContext, useReducer } from "react"
 
 interface Patient {
@@ -34,13 +35,16 @@ type Action =
   | { type: "ADD_APPOINTMENT"; payload: Appointment }
 
 interface DataContextType extends DataState {
-  addPatient: (patient: Patient) => Promise<void>
-  addAppointment: (appointment: Appointment) => Promise<void>
+  addPatient: (patient: Omit<Patient, "id">) => Promise<void> // ID será generado por Supabase
+  addAppointment: (appointment: Omit<Appointment, "id">) => Promise<void> // ID será generado por Supabase
+
   fetchPatients: () => Promise<void>
   fetchAppointments: () => Promise<void>
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined)
+
+
 
 function dataReducer(state: DataState, action: Action): DataState {
   switch (action.type) {
@@ -69,59 +73,107 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     error: null,
   })
 
-  const addPatient = async (patient: Patient) => {
+  const addPatient = async (patient: Omit<Patient, "id">) => {
+    dispatch({ type: "SET_LOADING", payload: true })
+    dispatch({ type: "SET_ERROR", payload: null })
+
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      dispatch({ type: "ADD_PATIENT", payload: patient })
-      dispatch({ type: "SET_LOADING", payload: false })
+      const { data, error } = await supabase
+        .from("patients") // Asegúrate que 'patients' es el nombre de tu tabla
+        .insert({ name: patient.name, phone: patient.phone, email: patient.email })
+        .select()
+        .single() // Espera un solo objeto de vuelta
+
+      if (error) throw error
+      if (data) {
+        dispatch({ type: "ADD_PATIENT", payload: data as Patient })
+      } else {
+        throw new Error("Paciente añadido, pero no se pudieron recuperar los datos.")
+      }
     } catch (error) {
       dispatch({ type: "SET_ERROR", payload: error as Error })
-      dispatch({ type: "SET_LOADING", payload: false })
       throw error
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
     }
   }
 
-  const addAppointment = async (appointment: Appointment) => {
+  const addAppointment = async (appointment: Omit<Appointment, "id">) => {
+    dispatch({ type: "SET_LOADING", payload: true })
+    dispatch({ type: "SET_ERROR", payload: null })
+
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      dispatch({ type: "ADD_APPOINTMENT", payload: appointment })
-      dispatch({ type: "SET_LOADING", payload: false })
+      const { data, error } = await supabase
+        .from("appointments") // Asegúrate que 'appointments' es el nombre de tu tabla
+        .insert({
+          patientId: appointment.patientId,
+          date: appointment.date,
+          time: appointment.time,
+          type: appointment.type,
+          status: appointment.status,
+        })
+        .select()
+        .single() // Espera un solo objeto de vuelta
+
+      if (error) throw error
+      if (data) {
+        dispatch({ type: "ADD_APPOINTMENT", payload: data as Appointment })
+      } else {
+        throw new Error("Cita añadida, pero no se pudieron recuperar los datos.")
+      }
+
     } catch (error) {
       dispatch({ type: "SET_ERROR", payload: error as Error })
-      dispatch({ type: "SET_LOADING", payload: false })
       throw error
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
     }
+
   }
 
   const fetchPatients = async () => {
+    dispatch({ type: "SET_LOADING", payload: true })
+    dispatch({ type: "SET_ERROR", payload: null })
+
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      dispatch({ type: "SET_PATIENTS", payload: [] })
-      dispatch({ type: "SET_LOADING", payload: false })
+      const { data, error } = await supabase
+        .from("patients") // Asegúrate que 'patients' es el nombre de tu tabla
+        .select("*")
+
+      if (error) throw error
+      dispatch({ type: "SET_PATIENTS", payload: data || [] })
+
     } catch (error) {
       dispatch({ type: "SET_ERROR", payload: error as Error })
-      dispatch({ type: "SET_LOADING", payload: false })
+
       throw error
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
     }
+
   }
 
   const fetchAppointments = async () => {
+    dispatch({ type: "SET_LOADING", payload: true })
+    dispatch({ type: "SET_ERROR", payload: null })
+
     try {
-      dispatch({ type: "SET_LOADING", payload: true })
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      dispatch({ type: "SET_APPOINTMENTS", payload: [] })
-      dispatch({ type: "SET_LOADING", payload: false })
+      const { data, error } = await supabase
+        .from("appointments") // Asegúrate que 'appointments' es el nombre de tu tabla
+        .select("*")
+      // Si necesitas datos relacionados, por ejemplo, del paciente:
+      // .select("*, patients(name)") // Asegúrate que 'patients' es el nombre de la tabla relacionada
+
+      if (error) throw error
+      dispatch({ type: "SET_APPOINTMENTS", payload: data || [] })
+
     } catch (error) {
       dispatch({ type: "SET_ERROR", payload: error as Error })
-      dispatch({ type: "SET_LOADING", payload: false })
+
       throw error
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
+
     }
   }
 
