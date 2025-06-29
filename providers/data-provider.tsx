@@ -1,6 +1,6 @@
 "use client"
 
-import { supabase } from "@/lib/supabaseClient"
+import { supabase } from "@/lib/supabase"
 import React, { createContext, useContext, useReducer } from "react"
 
 interface Patient {

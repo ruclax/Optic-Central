@@ -1,16 +1,17 @@
 "use client"
 
-import React, { createContext, useContext, useEffect, useState } from "react"
-import { supabase } from "@/lib/supabaseClient"
+import React, { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react"
+import { supabase } from "@/lib/supabase"
+import { setupSessionCleanup, setupWindowCleanup } from "@/lib/session-utils"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface User {
   id: string
   name: string
-  role: string
-  role_id?: string // <-- Agregado para control dinámico
-  default_route?: string
   email?: string
+  role: string
+  role_id?: string
+  default_route?: string
 }
 
 interface AuthState {
@@ -20,7 +21,6 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  // login: (username: string, password: string) => Promise<void>
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
 }
@@ -34,114 +34,201 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     error: null,
   })
 
-  interface ProfileWithRoles {
-    full_name?: string
-    role_id?: string
-    roles?: { name: string, default_route?: string } | { name: string, default_route?: string }[] | null
-  }
+  const [fetchingUsers, setFetchingUsers] = useState(new Set())
 
-  const fetchUserProfile = async (userId: string): Promise<ProfileWithRoles> => {
-    // Consulta el perfil y el rol real desde la tabla profiles y roles
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('full_name, role_id, roles(name, default_route)')
-      .eq('id', userId)
-      .single()
-    if (error) throw error
-    // Para depuración: muestra el resultado en consola
-    console.log('Perfil obtenido:', data)
-    return data as ProfileWithRoles
-  }
-
-  const mapSupabaseUserToAppUser = async (supabaseUser: SupabaseUser): Promise<User> => {
-    // Obtiene el perfil y el rol real desde la base de datos
-    const profile = await fetchUserProfile(supabaseUser.id)
-    let role = "user"
-    let default_route: string | undefined = undefined
-    let role_id: string | undefined = profile?.role_id
-    if (Array.isArray(profile?.roles)) {
-      role = profile.roles[0]?.name ?? "user"
-      default_route = profile.roles[0]?.default_route
-    } else if (profile && typeof profile.roles === "object" && profile.roles !== null && "name" in profile.roles) {
-      role = (profile.roles as { name: string }).name ?? "user"
-      default_route = (profile.roles as { default_route?: string }).default_route
+  const fetchUserProfile = async (userId: string) => {
+    if (fetchingUsers.has(userId)) {
+      return null
     }
-    return {
-      id: supabaseUser.id,
-      name: profile?.full_name || supabaseUser.user_metadata?.full_name || supabaseUser.email || "Usuario",
-      email: supabaseUser.email,
-      role,
-      role_id, // <-- Agregado
-      default_route,
+
+    setFetchingUsers(prev => new Set(prev).add(userId))
+
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name, role_id')
+        .eq('id', userId)
+        .single()
+
+      if (profileError || !profile) {
+        throw new Error('Profile not found')
+      }
+
+      return {
+        full_name: profile.full_name,
+        role_id: profile.role_id,
+        role_name: 'admin',
+        default_route: '/dashboard'
+      }
+    } catch (error) {
+      throw error
+    } finally {
+      setFetchingUsers(prev => {
+        const newSet = new Set(prev)
+        newSet.delete(userId)
+        return newSet
+      })
+    }
+  }
+
+  const mapSupabaseUserToAppUser = async (supabaseUser: SupabaseUser): Promise<User | null> => {
+    try {
+      const profileData = await fetchUserProfile(supabaseUser.id)
+
+      if (!profileData) {
+        return null
+      }
+
+      const appUser: User = {
+        id: supabaseUser.id,
+        name: profileData.full_name || supabaseUser.email || "Usuario",
+        email: supabaseUser.email,
+        role: profileData.role_name,
+        role_id: profileData.role_id,
+        default_route: profileData.default_route,
+      }
+
+      return appUser
+    } catch (error) {
+      return null
     }
   }
 
   useEffect(() => {
-    setState(prev => ({ ...prev, isLoading: true }))
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session) {
-        try {
-          const appUser = await mapSupabaseUserToAppUser(session.user)
-          setState(prev => ({ ...prev, user: appUser, isLoading: false }))
-          // Log global de usuario y role_id
-          console.log('[AUTH] Usuario autenticado:', appUser)
-          console.log('[AUTH] role_id:', appUser.role_id)
-        } catch (error) {
-          setState(prev => ({ ...prev, user: null, isLoading: false, error: error as Error }))
-        }
-      } else {
-        setState(prev => ({ ...prev, user: null, isLoading: false }))
-      }
-    })
+    const initAuth = async () => {
+      try {
+        setState(prev => ({ ...prev, isLoading: true, error: null }))
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        if (session) {
-          try {
-            const appUser = await mapSupabaseUserToAppUser(session.user)
+        const { data: { session } } = await supabase.auth.getSession()
+
+        if (session?.user) {
+          const appUser = await mapSupabaseUserToAppUser(session.user)
+          if (appUser) {
             setState({ user: appUser, isLoading: false, error: null })
-            // Log global de usuario y role_id
-            console.log('[AUTH] Usuario autenticado:', appUser)
-            console.log('[AUTH] role_id:', appUser.role_id)
-          } catch (error) {
-            setState({ user: null, isLoading: false, error: error as Error })
+          } else {
+            setState({ user: null, isLoading: false, error: new Error('Failed to map user') })
           }
         } else {
           setState({ user: null, isLoading: false, error: null })
+        }
+      } catch (error) {
+        setState({ user: null, isLoading: false, error: error as Error })
+      }
+    }
+
+    initAuth()
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        try {
+          if (session?.user) {
+            const appUser = await mapSupabaseUserToAppUser(session.user)
+            if (appUser) {
+              setState({ user: appUser, isLoading: false, error: null })
+            } else {
+              setState({ user: null, isLoading: false, error: new Error('Failed to map user') })
+            }
+          } else {
+            setState({ user: null, isLoading: false, error: null })
+          }
+        } catch (error) {
+          setState({ user: null, isLoading: false, error: error as Error })
         }
       }
     )
 
     return () => {
-      authListener?.subscription.unsubscribe()
+      subscription.unsubscribe()
     }
   }, [])
 
-  const login = async (email: string, password: string) => {
-    try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }))
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
-      if (error) throw error
-      // onAuthStateChange se encargará de actualizar el estado del usuario y isLoading
-    } catch (error) {
-      setState(prev => ({ ...prev, error: error as Error, isLoading: false, user: null }))
-      throw error
-    }
-  }
+  // Configurar limpieza automática de sesiones
+  useEffect(() => {
+    const cleanupSession = setupSessionCleanup()
+    const cleanupWindow = setupWindowCleanup()
 
-  const logout = async () => {
+    return () => {
+      cleanupSession()
+      cleanupWindow()
+    }
+  }, [])
+
+  const login = useCallback(async (email: string, password: string) => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }))
+
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      // onAuthStateChange se encargará de actualizar el estado del usuario a null y isLoading
+      const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+      if (error) {
+        setState(prev => ({ ...prev, error: error as Error, isLoading: false }))
+        throw error
+      }
     } catch (error) {
       setState(prev => ({ ...prev, error: error as Error, isLoading: false }))
       throw error
     }
-  }
+  }, [])
+
+  const logout = useCallback(async () => {
+    const { error } = await supabase.auth.signOut()
+
+    if (error) {
+      setState(prev => ({ ...prev, error: error as Error }))
+      throw error
+    }
+  }, [])
+
+  // Función para verificar si la sesión sigue siendo válida
+  const verifySession = useCallback(async () => {
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser()
+
+      if (error || !user) {
+        // Si hay error o no hay usuario, limpiar estado
+        setState({ user: null, isLoading: false, error: null })
+        return false
+      }
+
+      return true
+    } catch (error) {
+      setState({ user: null, isLoading: false, error: error as Error })
+      return false
+    }
+  }, [])
+
+  // Verificar sesión cuando la ventana recupera el foco
+  useEffect(() => {
+    const handleFocus = () => {
+      if (state.user) {
+        verifySession()
+      }
+    }
+
+    const handleOnline = () => {
+      if (state.user) {
+        verifySession()
+      }
+    }
+
+    // Verificar sesión cuando se recupera el foco
+    window.addEventListener('focus', handleFocus)
+    // Verificar sesión cuando se recupera la conexión
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      window.removeEventListener('focus', handleFocus)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [state.user, verifySession])
+
+  const contextValue = useMemo(() => ({
+    ...state,
+    login,
+    logout
+  }), [state, login, logout])
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )

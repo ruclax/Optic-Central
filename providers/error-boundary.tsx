@@ -1,10 +1,10 @@
 "use client"
 
-import React, { Component, ErrorInfo } from "react"
+import React, { Component, ErrorInfo, ReactNode } from "react"
 
 interface Props {
-  children: React.ReactNode
-  fallback?: React.ReactNode
+  children: ReactNode
+  fallback?: ReactNode
 }
 
 interface State {
@@ -13,8 +13,9 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
+  constructor(props: Props) {
+    super(props)
+    this.state = { hasError: false }
   }
 
   public static getDerivedStateFromError(error: Error): State {
@@ -35,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
               <p className="text-muted-foreground mb-4">{this.state.error?.message}</p>
               <button
                 className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
-                onClick={() => this.setState({ hasError: false })}
+                onClick={() => this.setState({ hasError: false, error: undefined })}
               >
                 Try again
               </button>

@@ -1,249 +1,377 @@
 "use client"
 
-import { Suspense } from "react"
-import { useState, useEffect } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ArrowLeft, Save, Eye, User, Search, CheckCircle, AlertCircle } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
-import { useIsAdmin, useHasRoleId } from "@/hooks/useRoles"
 import { useAuth } from "@/providers/auth-provider"
-import { createClient } from "@supabase/supabase-js"
+import { CheckCircle, Stethoscope } from "lucide-react"
+import { useExams, usePatients } from "@/hooks/useSupabaseCRUD"
+import { toast } from "@/hooks/use-toast"
 
-// Datos de ejemplo de pacientes
-const examTypes = [
-  "Examen completo",
-  "Examen de seguimiento",
-  "Examen post-operatorio",
-  "Examen de rutina",
-  "Primera consulta",
-  "Control de presión",
-  "Examen especializado",
-]
+type NewExamFormProps = {
+  onSuccess?: () => void
+  onCancel?: () => void
+}
 
-// Permitir que el formulario acepte onSuccess y onCancel como props
-function NewExamPageContent({ onSuccess, onCancel }: { onSuccess?: () => void; onCancel?: () => void }) {
-  const isAdmin = useIsAdmin()
-  // IDs de roles desde variables de entorno o valores por defecto
-  const DOCTOR_ROLE_ID = process.env.NEXT_PUBLIC_DOCTOR_ROLE_ID || "2"
-  const OPTOMETRIST_ROLE_ID = process.env.NEXT_PUBLIC_OPTOMETRIST_ROLE_ID || "3"
-  const isDoctor = useHasRoleId(DOCTOR_ROLE_ID)
-  const isOptometrist = useHasRoleId(OPTOMETRIST_ROLE_ID)
+export default function NewExamForm({ onSuccess, onCancel }: NewExamFormProps) {
   const { user } = useAuth()
-  const router = useRouter()
-  const searchParams = useSearchParams()
-  const preselectedPatient = searchParams.get("patient")
-
-  const [isLoading, setIsLoading] = useState(false)
+  const { createItem, loading } = useExams()
+  const { data: patients } = usePatients()
   const [showSuccess, setShowSuccess] = useState(false)
-  const [patientSearch, setPatientSearch] = useState("")
   const [examData, setExamData] = useState({
     // Información básica
-    patientId: preselectedPatient || "",
-    patientName: "",
-    date: new Date().toISOString().split("T")[0],
-    type: "",
-    doctor: "",
+    patient_id: "",
+    exam_date: new Date().toISOString().split('T')[0],
+    exam_type: "Examen General",
+    status: "pending",
 
-    // Resultados ojo derecho
-    rightEyeSphere: "",
-    rightEyeCylinder: "",
-    rightEyeAxis: "",
-    rightEyeVision: "",
-    rightEyePressure: "",
+    // Agudeza visual
+    visual_acuity_right: "",
+    visual_acuity_left: "",
 
-    // Resultados ojo izquierdo
-    leftEyeSphere: "",
-    leftEyeCylinder: "",
-    leftEyeAxis: "",
-    leftEyeVision: "",
-    leftEyePressure: "",
+    // Refracción ojo derecho
+    right_eye_sphere: "",
+    right_eye_cylinder: "",
+    right_eye_axis: "",
+    right_eye_add: "",
 
-    // Otros datos
-    pupillaryDistance: "",
-    notes: "",
+    // Refracción ojo izquierdo
+    left_eye_sphere: "",
+    left_eye_cylinder: "",
+    left_eye_axis: "",
+    left_eye_add: "",
+
+    // Medidas adicionales
+    pupillary_distance: "",
+    intraocular_pressure_right: "",
+    intraocular_pressure_left: "",
+
+    // Observaciones
+    findings: "",
+    diagnosis: "",
     recommendations: "",
-    followUpDate: "",
+    notes: "",
+
+    // Archivos
+    files_urls: "",
+
+    // Próxima cita
+    next_appointment_date: ""
   })
 
-  const [patients, setPatients] = useState<any[]>([])
-  const [doctors, setDoctors] = useState<any[]>([])
-
-  useEffect(() => {
-    const fetchPatients = async () => {
-      const { data } = await supabase.from("patients").select("id, first_name, last_name, phone")
-      if (data) setPatients(data)
-    }
-    const fetchDoctors = async () => {
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, full_name, role:roles(name)")
-      if (data) setDoctors(data.filter((d: any) => d.role && (d.role[0]?.name === "DOCTOR" || d.role[0]?.name === "OPTOMETRISTA")))
-    }
-    fetchPatients()
-    fetchDoctors()
-  }, [])
-
-  const filteredPatients = patients.filter(
-    (patient) =>
-      `${patient.first_name} ${patient.last_name}`.toLowerCase().includes(patientSearch.toLowerCase()) ||
-      patient.id.includes(patientSearch) ||
-      (patient.phone || "").includes(patientSearch),
-  )
-
-  const handleInputChange = (field: string, value: string) => {
-    setExamData((prev) => ({
-      ...prev,
-      [field]: value,
-    }))
-  }
-
-  // Cuando se selecciona un paciente, se asigna el nombre real
-  const handlePatientSelect = (patient: any) => {
-    setExamData((prev) => ({
-      ...prev,
-      patientId: patient.id,
-      patientName: `${patient.first_name} ${patient.last_name}`,
-    }))
-    setPatientSearch("")
+  // Handlers
+  const handleInputChange = (field: string, value: any) => {
+    setExamData(prev => ({ ...prev, [field]: value }))
   }
 
   const handleSave = async () => {
-    setIsLoading(true)
-    // Mapear campos del formulario a la tabla exams
-    const payload: any = {
-      patient_id: examData.patientId,
-      date: examData.date,
-      type: examData.type,
-      doctor: examData.doctor,
-      right_eye_sphere: examData.rightEyeSphere,
-      right_eye_cylinder: examData.rightEyeCylinder,
-      right_eye_axis: examData.rightEyeAxis,
-      right_eye_vision: examData.rightEyeVision,
-      right_eye_pressure: examData.rightEyePressure,
-      left_eye_sphere: examData.leftEyeSphere,
-      left_eye_cylinder: examData.leftEyeCylinder,
-      left_eye_axis: examData.leftEyeAxis,
-      left_eye_vision: examData.leftEyeVision,
-      left_eye_pressure: examData.leftEyePressure,
-      pupillary_distance: examData.pupillaryDistance,
-      notes: examData.notes,
+    // Validaciones básicas
+    if (!examData.patient_id) {
+      toast({
+        title: "Error",
+        description: "Debe seleccionar un paciente",
+        variant: "destructive"
+      })
+      return
+    }
+
+    // Mapear datos para crear el examen
+    const payload = {
+      patient_id: examData.patient_id,
+      doctor_id: user?.id,
+      exam_date: examData.exam_date,
+      exam_type: examData.exam_type,
+      status: examData.status,
+      visual_acuity_right: examData.visual_acuity_right,
+      visual_acuity_left: examData.visual_acuity_left,
+      right_eye_sphere: examData.right_eye_sphere,
+      right_eye_cylinder: examData.right_eye_cylinder,
+      right_eye_axis: examData.right_eye_axis,
+      right_eye_add: examData.right_eye_add,
+      left_eye_sphere: examData.left_eye_sphere,
+      left_eye_cylinder: examData.left_eye_cylinder,
+      left_eye_axis: examData.left_eye_axis,
+      left_eye_add: examData.left_eye_add,
+      pupillary_distance: examData.pupillary_distance,
+      intraocular_pressure_right: examData.intraocular_pressure_right,
+      intraocular_pressure_left: examData.intraocular_pressure_left,
+      findings: examData.findings,
+      diagnosis: examData.diagnosis,
       recommendations: examData.recommendations,
-      follow_up_date: examData.followUpDate,
-      created_by_profile_id: user?.id,
+      notes: examData.notes,
+      files_urls: examData.files_urls,
+      next_appointment_date: examData.next_appointment_date || null,
+      created_by_profile_id: user?.id
     }
-    const { error } = await supabase.from("exams").insert(payload)
-    setIsLoading(false)
-    if (!error) {
+
+    const result = await createItem(payload)
+    if (result) {
       setShowSuccess(true)
-      setTimeout(() => {
-        if (onSuccess) {
+      toast({
+        title: "Examen creado",
+        description: "El examen ha sido registrado correctamente"
+      })
+      if (onSuccess) {
+        setTimeout(() => {
           onSuccess()
-        } else {
-          router.push("/exams")
-        }
-      }, 2000)
+        }, 1500)
+      }
     } else {
-      alert("Error al registrar examen: " + error.message)
+      toast({
+        title: "Error",
+        description: "No se pudo crear el examen",
+        variant: "destructive"
+      })
     }
   }
 
-  // Supabase client
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
-  const isFormValid = () => {
-    return examData.patientId && examData.type && examData.doctor
-  }
-
-  // Proteger acceso
-  const canCreate = isAdmin || isDoctor || isOptometrist
-  if (!canCreate) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96">
-        <h2 className="text-2xl font-bold mb-2">Acceso denegado</h2>
-        <p className="text-muted-foreground">No tienes permisos para registrar exámenes.</p>
-      </div>
-    )
-  }
-
-  if (showSuccess) {
-    return (
-      <div className="min-h-[400px] flex items-center justify-center">
-        <Card className="w-full max-w-md text-center">
-          <CardContent className="pt-6">
-            <CheckCircle className="h-16 w-16 text-green-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold mb-2">¡Examen Registrado!</h2>
-            <p className="text-muted-foreground mb-4">
-              El examen de {examData.patientName} ha sido registrado exitosamente.
-            </p>
-            <p className="text-sm text-muted-foreground">Redirigiendo a la lista de exámenes...</p>
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
-
   return (
-    <form className="space-y-6" onSubmit={e => { e.preventDefault(); if (isFormValid()) handleSave(); }} autoComplete="off" aria-modal="true" role="dialog">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold tracking-tight">Nuevo Examen</h1>
-        {/* Eliminado botón Cancelar duplicado del header */}
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <Label htmlFor="patientId">Paciente</Label>
-          <Input id="patientId" autoFocus value={examData.patientId} onChange={e => handleInputChange("patientId", e.target.value)} required className="w-full" />
-        </div>
-        <div>
-          <Label htmlFor="date">Fecha</Label>
-          <Input id="date" type="date" value={examData.date} onChange={e => handleInputChange("date", e.target.value)} required className="w-full" />
-        </div>
-        <div>
-          <Label htmlFor="type">Tipo de examen</Label>
-          <Select value={examData.type} onValueChange={v => handleInputChange("type", v)}>
-            <SelectTrigger id="type" className="w-full">
-              <SelectValue placeholder="Selecciona tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              {examTypes.map((type) => (
-                <SelectItem key={type} value={type}>{type}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="doctor">Doctor</Label>
-          <Input id="doctor" value={examData.doctor} onChange={e => handleInputChange("doctor", e.target.value)} required className="w-full" />
-        </div>
-        {/* Más campos aquí, siguiendo el mismo patrón, con etiquetas y feedback */}
-        <div className="md:col-span-2">
-          <Label htmlFor="notes">Notas</Label>
-          <Textarea id="notes" value={examData.notes} onChange={e => handleInputChange("notes", e.target.value)} className="w-full" rows={2} />
-        </div>
-      </div>
-      <div className="flex justify-end gap-2 pt-2">
-        <Button type="button" variant="outline" onClick={() => onCancel ? onCancel() : router.push('/exams')}>Cancelar</Button>
-        <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white min-w-[120px]" disabled={isLoading || !isFormValid()}>
-          {isLoading ? "Guardando..." : "Guardar"}
-        </Button>
-      </div>
-    </form>
-  )
-}
+    <Card className="bg-background text-foreground border border-border shadow-md max-w-4xl mx-auto">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 font-heading">
+          <Stethoscope className="h-5 w-5" />
+          Nuevo Examen
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {showSuccess && (
+          <Alert className="border-emerald-200 bg-emerald-50 text-emerald-800">
+            <CheckCircle className="h-5 w-5 text-emerald-500" />
+            <AlertDescription>Examen creado correctamente.</AlertDescription>
+          </Alert>
+        )}
 
-export default function NewExamPage(props: any) {
-  return (
-    <Suspense>
-      <NewExamPageContent {...props} />
-    </Suspense>
+        {/* Información básica */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Paciente *</Label>
+            <Select value={examData.patient_id} onValueChange={v => handleInputChange("patient_id", v)}>
+              <SelectTrigger className="bg-card text-card-foreground border border-border">
+                <SelectValue placeholder="Seleccionar paciente" />
+              </SelectTrigger>
+              <SelectContent>
+                {patients.map((patient) => (
+                  <SelectItem key={patient.id} value={patient.id}>
+                    {patient.first_name} {patient.last_name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Fecha del Examen</Label>
+            <Input
+              className="bg-card text-card-foreground border border-border"
+              value={examData.exam_date}
+              onChange={e => handleInputChange("exam_date", e.target.value)}
+              type="date"
+            />
+          </div>
+          <div>
+            <Label>Tipo de Examen</Label>
+            <Select value={examData.exam_type} onValueChange={v => handleInputChange("exam_type", v)}>
+              <SelectTrigger className="bg-card text-card-foreground border border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Examen General">Examen General</SelectItem>
+                <SelectItem value="Revisión">Revisión</SelectItem>
+                <SelectItem value="Examen Inicial">Examen Inicial</SelectItem>
+                <SelectItem value="Control">Control</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Estado</Label>
+            <Select value={examData.status} onValueChange={v => handleInputChange("status", v)}>
+              <SelectTrigger className="bg-card text-card-foreground border border-border">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pendiente</SelectItem>
+                <SelectItem value="completed">Completado</SelectItem>
+                <SelectItem value="in_progress">En Proceso</SelectItem>
+                <SelectItem value="cancelled">Cancelado</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Refracción */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Refracción</h3>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <h4 className="font-medium">Ojo Derecho</h4>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <Label className="text-xs">Esfera</Label>
+                  <Input
+                    placeholder="±0.00"
+                    value={examData.right_eye_sphere}
+                    onChange={e => handleInputChange("right_eye_sphere", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Cilindro</Label>
+                  <Input
+                    placeholder="±0.00"
+                    value={examData.right_eye_cylinder}
+                    onChange={e => handleInputChange("right_eye_cylinder", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Eje</Label>
+                  <Input
+                    placeholder="0-180"
+                    value={examData.right_eye_axis}
+                    onChange={e => handleInputChange("right_eye_axis", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Add</Label>
+                  <Input
+                    placeholder="+0.00"
+                    value={examData.right_eye_add}
+                    onChange={e => handleInputChange("right_eye_add", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h4 className="font-medium">Ojo Izquierdo</h4>
+              <div className="grid grid-cols-4 gap-2">
+                <div>
+                  <Label className="text-xs">Esfera</Label>
+                  <Input
+                    placeholder="±0.00"
+                    value={examData.left_eye_sphere}
+                    onChange={e => handleInputChange("left_eye_sphere", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Cilindro</Label>
+                  <Input
+                    placeholder="±0.00"
+                    value={examData.left_eye_cylinder}
+                    onChange={e => handleInputChange("left_eye_cylinder", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Eje</Label>
+                  <Input
+                    placeholder="0-180"
+                    value={examData.left_eye_axis}
+                    onChange={e => handleInputChange("left_eye_axis", e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label className="text-xs">Add</Label>
+                  <Input
+                    placeholder="+0.00"
+                    value={examData.left_eye_add}
+                    onChange={e => handleInputChange("left_eye_add", e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Medidas adicionales */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label>Distancia Pupilar</Label>
+            <Input
+              placeholder="mm"
+              value={examData.pupillary_distance}
+              onChange={e => handleInputChange("pupillary_distance", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Presión Intraocular OD</Label>
+            <Input
+              placeholder="mmHg"
+              value={examData.intraocular_pressure_right}
+              onChange={e => handleInputChange("intraocular_pressure_right", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Presión Intraocular OI</Label>
+            <Input
+              placeholder="mmHg"
+              value={examData.intraocular_pressure_left}
+              onChange={e => handleInputChange("intraocular_pressure_left", e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Observaciones */}
+        <div className="space-y-4">
+          <div>
+            <Label>Hallazgos</Label>
+            <Textarea
+              placeholder="Describe los hallazgos del examen..."
+              value={examData.findings}
+              onChange={e => handleInputChange("findings", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Diagnóstico</Label>
+            <Textarea
+              placeholder="Diagnóstico principal..."
+              value={examData.diagnosis}
+              onChange={e => handleInputChange("diagnosis", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Recomendaciones</Label>
+            <Textarea
+              placeholder="Recomendaciones para el paciente..."
+              value={examData.recommendations}
+              onChange={e => handleInputChange("recommendations", e.target.value)}
+            />
+          </div>
+          <div>
+            <Label>Notas Adicionales</Label>
+            <Textarea
+              placeholder="Notas adicionales..."
+              value={examData.notes}
+              onChange={e => handleInputChange("notes", e.target.value)}
+            />
+          </div>
+        </div>
+
+        {/* Botones */}
+        <div className="flex justify-end space-x-2 pt-4">
+          {onCancel && (
+            <Button variant="outline" onClick={onCancel} disabled={loading}>
+              Cancelar
+            </Button>
+          )}
+          <Button
+            onClick={handleSave}
+            disabled={loading || !examData.patient_id}
+            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Guardando...
+              </div>
+            ) : (
+              "Crear Examen"
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

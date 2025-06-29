@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -12,23 +12,29 @@ import { ArrowLeft, Save, User, Eye, AlertCircle, CheckCircle } from "lucide-rea
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { useIsAdmin, useHasRoleId } from "@/hooks/useRoles"
 import { useAuth } from "@/providers/auth-provider"
-import { createClient } from "@supabase/supabase-js"
+import { usePatients } from "@/hooks/useSupabaseCRUD"
+import { toast } from "@/hooks/use-toast"
 
-export default function NewPatientPage() {
-  const isAdmin = useIsAdmin()
-  // IDs de roles desde variables de entorno o valores por defecto
-  const DOCTOR_ROLE_ID = process.env.NEXT_PUBLIC_DOCTOR_ROLE_ID || "2"
-  const OPTOMETRIST_ROLE_ID = process.env.NEXT_PUBLIC_OPTOMETRIST_ROLE_ID || "3"
-  const RECEPTIONIST_ROLE_ID = process.env.NEXT_PUBLIC_RECEPTIONIST_ROLE_ID || "4"
-  const isDoctor = useHasRoleId(DOCTOR_ROLE_ID)
-  const isOptometrist = useHasRoleId(OPTOMETRIST_ROLE_ID)
-  const isReceptionist = useHasRoleId(RECEPTIONIST_ROLE_ID)
+interface NewPatientPageProps {
+  onSuccess?: () => void;
+  onCancel?: () => void;
+}
+
+export default function NewPatientPage({ onSuccess, onCancel }: NewPatientPageProps) {
   const { user } = useAuth()
   const router = useRouter()
-  const [isLoading, setIsLoading] = useState(false)
+  const { createItem, loading } = usePatients()
   const [showSuccess, setShowSuccess] = useState(false)
+  const [activeStep, setActiveStep] = useState<StepKey>("personal")
+  const stepLabels = {
+    personal: "Datos Personales",
+    medical: "Historial Médico",
+    optical: "Datos Ópticos",
+    notes: "Observaciones"
+  }
+  type StepKey = keyof typeof stepLabels
+  const stepOrder: StepKey[] = ["personal", "medical", "optical", "notes"]
   const [patientData, setPatientData] = useState({
     // Datos personales
     firstName: "",
@@ -66,26 +72,15 @@ export default function NewPatientPage() {
     }))
   }
 
-  // Proteger acceso
-  const canCreate = isAdmin || isDoctor || isOptometrist || isReceptionist
-  if (!canCreate) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96">
-        <h2 className="text-2xl font-bold mb-2">Acceso denegado</h2>
-        <p className="text-muted-foreground">No tienes permisos para registrar pacientes.</p>
-      </div>
-    )
+  const goToStep = (direction: "next" | "prev") => {
+    const idx = stepOrder.indexOf(activeStep)
+    if (direction === "next" && idx < stepOrder.length - 1) setActiveStep(stepOrder[idx + 1])
+    if (direction === "prev" && idx > 0) setActiveStep(stepOrder[idx - 1])
   }
 
-  // Supabase client
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  const supabase = createClient(supabaseUrl, supabaseAnonKey)
-
   const handleSave = async () => {
-    setIsLoading(true)
     // Mapear campos del formulario a la tabla patients
-    const payload: any = {
+    const payload = {
       first_name: patientData.firstName,
       last_name: patientData.lastName,
       phone: patientData.phone,
@@ -93,19 +88,43 @@ export default function NewPatientPage() {
       address: patientData.address,
       date_of_birth: patientData.birthDate,
       gender: patientData.gender,
-      created_by_profile_id: user?.id,
+      emergency_contact: patientData.emergencyContact,
+      emergency_phone: patientData.emergencyPhone,
+      allergies: patientData.allergies,
+      medications: patientData.medications,
       medical_history: patientData.medicalHistory,
-      notes: patientData.notes
+      right_eye_sphere: patientData.rightEyeSphere,
+      right_eye_cylinder: patientData.rightEyeCylinder,
+      right_eye_axis: patientData.rightEyeAxis,
+      left_eye_sphere: patientData.leftEyeSphere,
+      left_eye_cylinder: patientData.leftEyeCylinder,
+      left_eye_axis: patientData.leftEyeAxis,
+      pupillary_distance: patientData.pupillaryDistance,
+      notes: patientData.notes,
+      created_by_profile_id: user?.id,
+      active: true
     }
-    const { error } = await supabase.from("patients").insert(payload)
-    setIsLoading(false)
-    if (!error) {
+
+    const newPatient = await createItem(payload)
+    if (newPatient) {
       setShowSuccess(true)
-      setTimeout(() => {
-        router.push("/patients")
-      }, 2000)
+      toast({
+        title: "Paciente creado",
+        description: `El expediente de ${patientData.firstName} ${patientData.lastName} ha sido creado exitosamente.`
+      })
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        setTimeout(() => {
+          router.push("/patients")
+        }, 2000)
+      }
     } else {
-      alert("Error al registrar paciente: " + error.message)
+      toast({
+        title: "Error",
+        description: "No se pudo crear el paciente. Intente nuevamente.",
+        variant: "destructive"
+      })
     }
   }
 
@@ -135,33 +154,18 @@ export default function NewPatientPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-4">
-          <Link href="/patients">
-            <Button variant="outline" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Volver a Pacientes
-            </Button>
-          </Link>
+          <Button variant="outline" size="sm" onClick={onCancel ? onCancel : () => router.back()}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver a Pacientes
+          </Button>
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Nuevo Paciente</h1>
             <p className="text-muted-foreground text-sm sm:text-base">Complete la información para crear un nuevo expediente</p>
           </div>
         </div>
         <div className="flex items-center space-x-2 w-full sm:w-auto">
-          <Button variant="outline" onClick={() => router.back()} className="w-full sm:w-auto">
+          <Button variant="outline" onClick={onCancel ? onCancel : () => router.back()} className="w-full sm:w-auto">
             Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={!isFormValid() || isLoading} className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto">
-            {isLoading ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                Guardando...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Guardar Paciente
-              </>
-            )}
           </Button>
         </div>
       </div>
@@ -185,15 +189,15 @@ export default function NewPatientPage() {
           <CardDescription>Complete todos los campos necesarios para crear el expediente</CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="personal" className="w-full">
-            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1 sm:gap-2 mb-4">
-              <TabsTrigger value="personal" className="text-xs sm:text-sm py-2 sm:py-3">Datos Personales</TabsTrigger>
-              <TabsTrigger value="medical" className="text-xs sm:text-sm py-2 sm:py-3">Historial Médico</TabsTrigger>
-              <TabsTrigger value="optical" className="text-xs sm:text-sm py-2 sm:py-3">Datos Ópticos</TabsTrigger>
-              <TabsTrigger value="notes" className="text-xs sm:text-sm py-2 sm:py-3">Observaciones</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="personal" className="space-y-6">
+          {/* Flujo guiado por pasos */}
+          <div className="w-full flex justify-between mb-4">
+            {stepOrder.map((step, idx) => (
+              <div key={step} className={`flex-1 text-center text-xs sm:text-sm font-medium py-1 rounded ${activeStep === step ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>{stepLabels[step]}</div>
+            ))}
+          </div>
+          {activeStep === "personal" && (
+            <div className="space-y-6">
+              {/* Campos de información personal */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-2">
                   <Label htmlFor="firstName">Nombre *</Label>
@@ -286,9 +290,14 @@ export default function NewPatientPage() {
                   />
                 </div>
               </div>
-            </TabsContent>
-
-            <TabsContent value="medical" className="space-y-6">
+              <div className="flex justify-end gap-2 mt-4">
+                <Button onClick={() => goToStep("next")} className="bg-primary text-primary-foreground">Siguiente</Button>
+              </div>
+            </div>
+          )}
+          {activeStep === "medical" && (
+            <div className="space-y-6">
+              {/* Campos de historial médico */}
               <div className="space-y-4 sm:space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="allergies">Alergias</Label>
@@ -321,16 +330,21 @@ export default function NewPatientPage() {
                   />
                 </div>
               </div>
-            </TabsContent>
-
-            <TabsContent value="optical" className="space-y-6">
+              <div className="flex justify-between gap-2 mt-4">
+                <Button variant="outline" onClick={() => goToStep("prev")} className="bg-background text-foreground border border-border">Anterior</Button>
+                <Button onClick={() => goToStep("next")} className="bg-primary text-primary-foreground">Siguiente</Button>
+              </div>
+            </div>
+          )}
+          {activeStep === "optical" && (
+            <div className="space-y-6">
+              {/* Campos de datos ópticos */}
               <div className="space-y-4 sm:space-y-6">
                 <div>
                   <h3 className="text-base sm:text-lg font-semibold mb-2 sm:mb-4 flex items-center">
                     <Eye className="h-5 w-5 mr-2 text-blue-600" />
                     Prescripción Óptica
                   </h3>
-
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                     {/* Ojo Derecho */}
                     <Card>
@@ -367,7 +381,6 @@ export default function NewPatientPage() {
                         </div>
                       </CardContent>
                     </Card>
-
                     {/* Ojo Izquierdo */}
                     <Card>
                       <CardHeader>
@@ -404,7 +417,6 @@ export default function NewPatientPage() {
                       </CardContent>
                     </Card>
                   </div>
-
                   <div className="mt-4 sm:mt-6">
                     <div className="space-y-2">
                       <Label htmlFor="pupillaryDistance">Distancia Pupilar (DP)</Label>
@@ -419,9 +431,15 @@ export default function NewPatientPage() {
                   </div>
                 </div>
               </div>
-            </TabsContent>
-
-            <TabsContent value="notes" className="space-y-4 sm:space-y-6">
+              <div className="flex justify-between gap-2 mt-4">
+                <Button variant="outline" onClick={() => goToStep("prev")} className="bg-background text-foreground border border-border">Anterior</Button>
+                <Button onClick={() => goToStep("next")} className="bg-primary text-primary-foreground">Siguiente</Button>
+              </div>
+            </div>
+          )}
+          {activeStep === "notes" && (
+            <div className="space-y-6">
+              {/* Campos de observaciones */}
               <div className="space-y-2">
                 <Label htmlFor="notes">Observaciones y Notas</Label>
                 <Textarea
@@ -433,8 +451,24 @@ export default function NewPatientPage() {
                   className="text-sm sm:text-base"
                 />
               </div>
-            </TabsContent>
-          </Tabs>
+              <div className="flex justify-between gap-2 mt-4">
+                <Button variant="outline" onClick={() => goToStep("prev")} className="bg-background text-foreground border border-border">Anterior</Button>
+                <Button onClick={handleSave} disabled={!isFormValid() || loading} className="bg-primary text-primary-foreground">
+                  {loading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Guardar Paciente
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -10,6 +10,7 @@ import { useAuth } from "@/providers/auth-provider"
 import { useRouter } from "next/navigation"
 
 export default function LoginPage() {
+    // console.log('[LOGIN] Component rendering')
     const [showPassword, setShowPassword] = useState(false)
     const [credentials, setCredentials] = useState({
         email: "",
@@ -20,51 +21,74 @@ export default function LoginPage() {
     const { login, user, isLoading } = useAuth()
     const router = useRouter()
 
-    // Redirección inmediata tras login exitoso
-    useEffect(() => {
-        if (!loading && user?.default_route) {
-            router.push(user.default_route)
-        }
-    }, [user, loading, router])
+    // console.log('[LOGIN] Auth state:', { user: user?.email, isLoading })
 
-    const handleLogin = async (e: React.FormEvent) => {
+    // Redirección automática si el usuario ya está autenticado
+    useEffect(() => {
+        // console.log('[LOGIN] useEffect - user:', user?.email, 'isLoading:', isLoading)
+        if (!isLoading && user) {
+            const redirectTo = user.default_route || '/dashboard'
+            // console.log('[LOGIN] Redirecting to:', redirectTo)
+            router.replace(redirectTo)
+        }
+    }, [user, isLoading, router])
+
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setError("")
+
         try {
             await login(credentials.email, credentials.password)
-            // Redirección ahora se maneja por useEffect
+            // El AuthProvider maneja la redirección
         } catch (err: any) {
-            setError(err.message || "Error al iniciar sesión")
+            console.error("Error de login:", err)
+            if (err.message?.includes("Invalid login credentials")) {
+                setError("Email o contraseña incorrectos")
+            } else {
+                setError(err.message || "Error al iniciar sesión")
+            }
         } finally {
             setLoading(false)
         }
     }
 
+    // Mostrar loading mientras se verifica la sesión
+    if (!isLoading && user) {
+        return null // Se está redirigiendo
+    }
+
     return (
         <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
             <Card className="w-full max-w-md">
-                <CardHeader className="text-center">
-                    <div className="flex justify-center mb-4">
-                        <div className="p-3 bg-blue-600 rounded-full">
+                <CardHeader className="space-y-1">
+                    <div className="flex items-center justify-center mb-4">
+                        <div className="rounded-full bg-blue-600 p-3">
                             <Glasses className="h-8 w-8 text-white" />
                         </div>
                     </div>
-                    <CardTitle className="text-2xl font-bold">Óptica Central</CardTitle>
-                    <CardDescription>Sistema de Gestión - Acceso para operarios</CardDescription>
+                    <CardTitle className="text-2xl font-bold text-center text-gray-900">
+                        Óptica Central
+                    </CardTitle>
+                    <CardDescription className="text-center text-gray-600">
+                        Ingresa tus credenciales para acceder al sistema
+                    </CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <form onSubmit={handleLogin} className="space-y-4">
+                <CardContent className="space-y-4">
+                    <form onSubmit={handleSubmit} className="space-y-4">
                         <div className="space-y-2">
-                            <Label htmlFor="email">Correo electrónico</Label>
+                            <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
                                 type="email"
-                                placeholder="Ingresa tu correo"
+                                placeholder="admin@opticacentral.com"
                                 value={credentials.email}
-                                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
+                                onChange={(e) =>
+                                    setCredentials({ ...credentials, email: e.target.value })
+                                }
                                 required
-                                autoComplete="username"
+                                disabled={loading}
+                                className="w-full"
                             />
                         </div>
                         <div className="space-y-2">
@@ -73,39 +97,50 @@ export default function LoginPage() {
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
-                                    placeholder="Ingresa tu contraseña"
+                                    placeholder="••••••••"
                                     value={credentials.password}
-                                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                                    onChange={(e) =>
+                                        setCredentials({ ...credentials, password: e.target.value })
+                                    }
                                     required
-                                    autoComplete="current-password"
+                                    disabled={loading}
+                                    className="w-full pr-10"
                                 />
-                                <Button
+                                <button
                                     type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                                    disabled={loading}
                                 >
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                </Button>
+                                    {showPassword ? (
+                                        <EyeOff className="h-4 w-4" />
+                                    ) : (
+                                        <Eye className="h-4 w-4" />
+                                    )}
+                                </button>
                             </div>
                         </div>
-                        {error && <div className="text-red-500 text-sm text-center mt-2">{error}</div>}
-                        <Button type="submit" className="w-full bg-blue-600 hover:bg-blue-700" disabled={loading}>
-                            {loading ? "Iniciando..." : "Iniciar Sesión"}
+                        {error && (
+                            <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
+                                {error}
+                            </div>
+                        )}
+                        <Button
+                            type="submit"
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                            disabled={loading}
+                        >
+                            {loading ? "Iniciando sesión..." : "Iniciar Sesión"}
                         </Button>
-                        <div className="flex justify-between mt-2">
-                            <a href="/reset-password" className="text-xs text-blue-600 hover:underline">¿Olvidaste tu contraseña?</a>
-                            {/* Aquí podrías agregar un checkbox para 'Recordar sesión' si quieres forzar persistencia extra */}
-                        </div>
                     </form>
-                    {isLoading && (
-                        <div className="flex justify-center mt-6">
-                            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                            <span className="ml-2 text-blue-600">Cargando...</span>
+                    <div className="text-center space-y-2">
+                        <div className="text-xs text-gray-500">
+                            Usuarios de prueba:
                         </div>
-                    )}
+                        <div className="text-xs text-gray-400">
+                            admin@opticacentral.com • Test1234*
+                        </div>
+                    </div>
                 </CardContent>
             </Card>
         </div>

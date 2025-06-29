@@ -1,303 +1,213 @@
 "use client"
 
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
   Users,
   Eye,
   UserPlus,
-  DollarSign,
-  Package,
+  TrendingUp,
+  Calendar,
+  Clock,
+  CheckCircle,
   AlertCircle,
+  ArrowRight,
+  Activity,
+  Star,
+  Shield
 } from "lucide-react"
 import Link from "next/link"
-import { useIsAdmin } from "@/hooks/useRoles"
-import { useRouter } from "next/navigation"
-import { useAuth } from "@/hooks/useAuth"
-
-// Datos de ejemplo
-const stats = [
-  {
-    title: "Total Pacientes",
-    value: "1,234",
-    change: "+12%",
-    icon: Users,
-    color: "text-blue-600",
-    href: "/patients",
-  },
-  {
-    title: "Exámenes Pendientes",
-    value: "8",
-    change: "-2%",
-    icon: Eye,
-    color: "text-orange-600",
-    href: "/exams",
-  },
-  {
-    title: "Ventas del Mes",
-    value: "$45,230",
-    change: "+18%",
-    icon: DollarSign,
-    color: "text-purple-600",
-    href: "/dashboard/sales",
-  },
-]
-
-const quickActions = [
-  {
-    title: "Nuevo Paciente",
-    description: "Registrar un nuevo paciente en el sistema",
-    icon: UserPlus,
-    color: "text-blue-600",
-    href: "/patients/new",
-  },
-  {
-    title: "Nuevo Examen",
-    description: "Realizar examen de vista a paciente",
-    icon: Eye,
-    color: "text-purple-600",
-    href: "/exams/new",
-  },
-  {
-    title: "Gestionar Inventario",
-    description: "Actualizar stock de monturas y lentes",
-    icon: Package,
-    color: "text-orange-600",
-    href: "/dashboard/inventory",
-  },
-]
+import { useAuth } from "@/providers/auth-provider"
+import { PageHeader } from "@/components/ui/PageHeader"
 
 export default function Dashboard() {
-  const { user, isLoading } = useAuth()
-  const isAdmin = useIsAdmin()
-  const router = useRouter()
+  const { user } = useAuth()
 
-  if (!isLoading && !user) {
-    // Si no está autenticado, redirige a login
-    router.replace("/login")
-    return null
-  }
+  // Datos de ejemplo mejorados
+  const stats = [
+    {
+      title: "Pacientes Activos",
+      value: "1,234",
+      change: "+12%",
+      trend: "up",
+      icon: Users,
+      color: "bg-gradient-to-br from-blue-500 to-blue-600",
+      href: "/patients"
+    },
+    {
+      title: "Exámenes Pendientes",
+      value: "23",
+      change: "-8%",
+      trend: "down",
+      icon: Eye,
+      color: "bg-gradient-to-br from-amber-500 to-amber-600",
+      href: "/exams"
+    },
+    {
+      title: "Citas de Hoy",
+      value: "12",
+      change: "+4",
+      trend: "up",
+      icon: Calendar,
+      color: "bg-gradient-to-br from-emerald-500 to-emerald-600",
+      href: "/appointments"
+    },
+    {
+      title: "Satisfacción",
+      value: "98%",
+      change: "+2%",
+      trend: "up",
+      icon: Star,
+      color: "bg-gradient-to-br from-purple-500 to-purple-600",
+      href: "/reviews"
+    }
+  ]
 
-  if (!isLoading && user && !isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96">
-        <h2 className="text-2xl font-bold mb-2">Acceso denegado</h2>
-        <p className="text-muted-foreground">Solo los administradores pueden acceder al dashboard principal.</p>
-      </div>
-    )
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center h-96">
-        <h2 className="text-2xl font-bold mb-2">Cargando...</h2>
-      </div>
-    )
-  }
+  const recentActivities = [
+    {
+      type: "exam",
+      patient: "María González",
+      action: "Examen completado",
+      time: "hace 2 horas",
+      status: "completed"
+    },
+    {
+      type: "appointment",
+      patient: "Carlos Rodríguez",
+      action: "Cita agendada",
+      time: "hace 3 horas",
+      status: "scheduled"
+    },
+    {
+      type: "patient",
+      patient: "Ana Martínez",
+      action: "Nuevo paciente registrado",
+      time: "hace 5 horas",
+      status: "new"
+    }
+  ]
 
   return (
-    <div className="space-y-6 px-2 sm:px-4">
-      {/* Welcome Section */}
-      <div className="pt-2 sm:pt-4">
-        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Bienvenido a Óptica Central</h1>
-        <p className="text-muted-foreground text-sm sm:text-base">
-          Gestiona pacientes, exámenes y operaciones de tu óptica desde un solo lugar.
-        </p>
-      </div>
-
-      {/* Stats Cards - Indicadores en una sola fila, minimalistas, sin cuadros, responsivos */}
-      <div className="w-full flex justify-center">
-        <div className="flex w-full max-w-7xl px-1 items-end justify-between gap-4 md:gap-8 py-1">
-          {stats.map((stat, index) => (
-            <Link
-              key={index}
-              href={stat.href}
-              className="flex flex-col items-center flex-1 min-w-0 group"
-            >
-              <span className="text-base md:text-lg lg:text-xl font-bold text-white mb-0.5 text-center">
-                {stat.title}
-              </span>
-              <span className="flex items-center gap-2 md:gap-3 text-xl md:text-2xl lg:text-3xl font-bold text-foreground group-hover:scale-105 transition-transform">
-                <stat.icon className={`h-6 w-6 md:h-8 md:w-8 lg:h-10 lg:w-10 ${stat.color}`} />
-                {stat.value}
-              </span>
-              <span className="text-xs md:text-sm text-green-600 mt-1 text-center">
-                {stat.change} desde el mes pasado
-              </span>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {/* Quick Actions - Botones grandes y bien distribuidos, tamaño similar a indicadores en desktop */}
-      <div>
-        <h2 className="text-lg sm:text-xl font-semibold mb-2 sm:mb-4">Acciones Rápidas</h2>
-        <div
-          className="grid grid-cols-2 gap-2 sm:gap-3 md:grid-cols-4 lg:grid-cols-6 w-full"
-        >
-          {quickActions.map((action, index) => (
-            <Link key={index} href={action.href} className="min-w-0">
-              <Card
-                className="flex flex-col items-center justify-center gap-2 py-4 sm:py-7 cursor-pointer hover:shadow-md transition-shadow h-full min-w-0 md:aspect-auto md:h-auto md:min-w-0 md:max-w-full md:flex-1 select-none active:scale-95 touch-manipulation w-full"
-                style={{ minWidth: 0, maxWidth: '100%' }}
-              >
-                <action.icon className="h-7 w-7 sm:h-10 sm:w-10 text-white" />
-                <span className="text-xs sm:text-sm md:text-base font-semibold text-white text-center truncate w-full uppercase tracking-wide">
-                  {action.title}
-                </span>
+    <div className="flex flex-col min-h-screen bg-background">
+      <PageHeader
+        icon={<Star className="h-6 w-6" />}
+        title="Panel de Control"
+        subtitle="Resumen y acceso rápido a las principales métricas y acciones"
+        badgeText={undefined}
+        actions={null}
+      />
+      <main className="flex-1 p-4 md:p-6 lg:p-8">
+        <div className="max-w-7xl mx-auto space-y-8">{/* Cards de estadísticas principales */}
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+            {stats.map((stat, index) => (
+              <Card key={index} className="group relative overflow-hidden border-0 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1 bg-background">
+                <div className={`absolute inset-0 opacity-5 group-hover:opacity-10 transition-opacity duration-300 ${stat.color}`} />
+                <CardHeader className="pb-3 relative">
+                  <div className="flex items-center justify-between">
+                    <div className={`p-2 rounded-lg ${stat.color} text-white shadow-lg`}>
+                      <stat.icon className="h-5 w-5" />
+                    </div>
+                    <div className={`flex items-center text-xs font-medium ${stat.trend === 'up' ? 'text-emerald-600' : 'text-amber-600'
+                      }`}>
+                      <TrendingUp className={`h-3 w-3 mr-1 ${stat.trend === 'down' ? 'rotate-180' : ''}`} />
+                      {stat.change}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-0 relative">
+                  <div className="text-3xl font-bold text-gray-900 mb-1">{stat.value}</div>
+                  <p className="text-sm text-gray-600 mb-4">{stat.title}</p>
+                  <Link href={stat.href}>
+                    <Button
+                      className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-300"
+                      size="sm"
+                    >
+                      Ver detalles
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Button>
+                  </Link>
+                </CardContent>
               </Card>
-            </Link>
-          ))}
+            ))}
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Acciones rápidas mejoradas */}
+            <Card className="lg:col-span-1 border-0 shadow-lg bg-background">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center space-x-2 text-lg font-semibold text-gray-900">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg">
+                    <UserPlus className="h-5 w-5" />
+                  </div>
+                  <span>Acciones Rápidas</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Link href="/patients/new">
+                  <Button className="w-full justify-start bg-gradient-to-r from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 text-blue-700 border border-blue-200 hover:border-blue-300 transition-all duration-300 shadow-sm hover:shadow-md">
+                    <Users className="mr-3 h-4 w-4" />
+                    Nuevo Paciente
+                    <ArrowRight className="ml-auto h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/exams/new">
+                  <Button className="w-full justify-start bg-gradient-to-r from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 text-emerald-700 border border-emerald-200 hover:border-emerald-300 transition-all duration-300 shadow-sm hover:shadow-md">
+                    <Eye className="mr-3 h-4 w-4" />
+                    Nuevo Examen
+                    <ArrowRight className="ml-auto h-4 w-4" />
+                  </Button>
+                </Link>
+                <Link href="/appointments/new">
+                  <Button className="w-full justify-start bg-gradient-to-r from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 text-amber-700 border border-amber-200 hover:border-amber-300 transition-all duration-300 shadow-sm hover:shadow-md">
+                    <Calendar className="mr-3 h-4 w-4" />
+                    Nueva Cita
+                    <ArrowRight className="ml-auto h-4 w-4" />
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+
+            {/* Actividad reciente */}
+            <Card className="lg:col-span-2 border-0 shadow-lg bg-background">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center space-x-2 text-lg font-semibold text-gray-900">
+                  <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-lg">
+                    <Activity className="h-5 w-5" />
+                  </div>
+                  <span>Actividad Reciente</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {recentActivities.map((activity, index) => (
+                  <div key={index} className="flex items-center space-x-4 p-3 rounded-lg bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 hover:border-gray-300 transition-all duration-300 hover:shadow-md">
+                    <div className={`p-2 rounded-full ${activity.status === 'completed' ? 'bg-emerald-100 text-emerald-600' :
+                      activity.status === 'scheduled' ? 'bg-blue-100 text-blue-600' :
+                        'bg-purple-100 text-purple-600'
+                      }`}>
+                      {activity.status === 'completed' ? <CheckCircle className="h-4 w-4" /> :
+                        activity.status === 'scheduled' ? <Clock className="h-4 w-4" /> :
+                          <UserPlus className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">
+                        {activity.patient}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        {activity.action}
+                      </p>
+                    </div>
+                    <div className="text-xs text-gray-500 flex items-center">
+                      <Clock className="h-3 w-3 mr-1" />
+                      {activity.time}
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
-
-      {/* Actividades Recientes: exámenes, pacientes nuevos, rechecks */}
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Actividades Recientes</CardTitle>
-            <CardDescription>Movimientos recientes en el sistema</CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto p-0">
-            {/* En mobile, mostrar como tarjetas apiladas */}
-            <div className="block md:hidden space-y-3 p-2">
-              {/* Ejemplo de actividades recientes en tarjetas */}
-              <div className="bg-zinc-900 rounded-lg p-3 flex flex-col gap-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>2025-06-22</span>
-                  <Badge className="bg-blue-700 text-white">Examen</Badge>
-                </div>
-                <div className="font-semibold text-white">María González</div>
-                <div className="text-white text-xs">Examen visual completo</div>
-                <div className="flex justify-end mt-1">
-                  <Link href="/exams/123"><Button size="sm" variant="outline">Ver</Button></Link>
-                </div>
-              </div>
-              <div className="bg-zinc-900 rounded-lg p-3 flex flex-col gap-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>2025-06-21</span>
-                  <Badge className="bg-green-700 text-white">Nuevo Paciente</Badge>
-                </div>
-                <div className="font-semibold text-white">Carlos Rodríguez</div>
-                <div className="text-white text-xs">Registro inicial</div>
-                <div className="flex justify-end mt-1">
-                  <Link href="/patients/002"><Button size="sm" variant="outline">Ver</Button></Link>
-                </div>
-              </div>
-              <div className="bg-zinc-900 rounded-lg p-3 flex flex-col gap-1">
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>2025-06-20</span>
-                  <Badge className="bg-purple-700 text-white">Recheck</Badge>
-                </div>
-                <div className="font-semibold text-white">Ana Martínez</div>
-                <div className="text-white text-xs">Revisión de lentes</div>
-                <div className="flex justify-end mt-1">
-                  <Link href="/patients/003"><Button size="sm" variant="outline">Ver</Button></Link>
-                </div>
-              </div>
-            </div>
-            {/* En desktop/tablet, tabla tradicional */}
-            <Table className="min-w-[600px] hidden md:table">
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Fecha</TableHead>
-                  <TableHead>Tipo</TableHead>
-                  <TableHead>Paciente</TableHead>
-                  <TableHead>Detalle</TableHead>
-                  <TableHead>Acciones</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {/* Ejemplo de actividades recientes */}
-                <TableRow>
-                  <TableCell className="text-white">2025-06-22</TableCell>
-                  <TableCell><Badge className="bg-blue-700 text-white">Examen</Badge></TableCell>
-                  <TableCell className="text-white">María González</TableCell>
-                  <TableCell className="text-white">Examen visual completo</TableCell>
-                  <TableCell>
-                    <Link href="/exams/123"><Button size="sm" variant="outline">Ver</Button></Link>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-white">2025-06-21</TableCell>
-                  <TableCell><Badge className="bg-green-700 text-white">Nuevo Paciente</Badge></TableCell>
-                  <TableCell className="text-white">Carlos Rodríguez</TableCell>
-                  <TableCell className="text-white">Registro inicial</TableCell>
-                  <TableCell>
-                    <Link href="/patients/002"><Button size="sm" variant="outline">Ver</Button></Link>
-                  </TableCell>
-                </TableRow>
-                <TableRow>
-                  <TableCell className="text-white">2025-06-20</TableCell>
-                  <TableCell><Badge className="bg-purple-700 text-white">Recheck</Badge></TableCell>
-                  <TableCell className="text-white">Ana Martínez</TableCell>
-                  <TableCell className="text-white">Revisión de lentes</TableCell>
-                  <TableCell>
-                    <Link href="/patients/003"><Button size="sm" variant="outline">Ver</Button></Link>
-                  </TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Resumen Línea de Maquilado de Lentes */}
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Línea de Maquilado de Lentes</CardTitle>
-            <CardDescription>Estado actual de los pedidos de lentes</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="bg-zinc-900 rounded-lg p-4 flex flex-col items-center min-h-[80px] touch-manipulation">
-                <span className="text-3xl font-bold text-white">5</span>
-                <span className="text-white mt-1">En proceso</span>
-              </div>
-              <div className="bg-zinc-900 rounded-lg p-4 flex flex-col items-center min-h-[80px] touch-manipulation">
-                <span className="text-3xl font-bold text-white">2</span>
-                <span className="text-white mt-1">Listos para entrega</span>
-              </div>
-              <div className="bg-zinc-900 rounded-lg p-4 flex flex-col items-center min-h-[80px] touch-manipulation">
-                <span className="text-3xl font-bold text-white">1</span>
-                <span className="text-white mt-1">Entregados hoy</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Alerts */}
-      <div>
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <AlertCircle className="h-5 w-5 text-orange-600" />
-              <span>Alertas</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex items-start space-x-3 p-3 bg-orange-50 rounded-lg">
-                <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5" />
-                <div>
-                  <p className="text-sm font-medium">Stock bajo</p>
-                  <p className="text-xs text-gray-600">Monturas modelo XY-123</p>
-                </div>
-              </div>
-              <div className="flex items-start space-x-3 p-3 bg-blue-50 rounded-lg">
-                <div>
-                  <p className="text-sm font-medium">Recordatorio</p>
-                  <p className="text-xs text-gray-600">Mantenimiento de equipos mañana</p>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      </main>
     </div>
   )
 }
