@@ -1,0 +1,37 @@
+export type Exam = {
+  id: number;
+  paciente_id?: number;
+  usuario_id?: string;
+  fecha_examen: string;
+  queratometria_od?: string;
+  queratometria_oi?: string;
+  exploracion_anexos?: string;
+  oftalmoscopia?: string;
+  rx_anterior_od?: string;
+  rx_anterior_oi?: string;
+  diagnostico_retinoscopia?: string;
+  diagnostico_subjetivo?: string;
+  rx_final_od?: string;
+  rx_final_oi?: string;
+  esfera_od?: number;
+  cilindro_od?: number;
+  eje_od?: number;
+  add_od?: number;
+  esfera_oi?: number;
+  cilindro_oi?: number;
+  eje_oi?: number;
+  add_oi?: number;
+  agudeza_visual_con?: string;
+  agudeza_visual_sin?: string;
+  distancia_interpupilar?: number;
+  distancia_pupilar?: number;
+  recomendaciones?: string;
+  tolerancia_paciente?: string;
+  notas_optometrista?: string;
+  proxima_cita?: string;
+  fecha_registro?: string;
+  // Relaciones opcionales para UI
+  paciente?: import("./patient").Patient;
+  usuario?: import("./user").User;
+  [key: string]: any;
+};
